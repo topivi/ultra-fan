@@ -15,6 +15,8 @@
 
 If your Dell machine exposes its fan controls through `/sys/class/hwmon`, this script can use that interface to make the fan react to heat instead of running at a fixed, noisy speed.
 
+This is based on the idea by TyTiTaM's <A href="https://www.reddit.com/r/SleepingOptiplex/comments/1rudwdu/ultimate_fan_control_guide_for_dell_optiplex_linux/">Reddit article</a>.
+
 ## What this project does
 
 This script:
@@ -96,7 +98,11 @@ Typical paths the script checks:
 
 ## Quick start
 
-Clone the repo:
+## Installing as a systemd service
+
+You can install the controller as a background service so it starts automatically on boot.
+
+1. Clone the repo and enter the project directory:
 
 ```bash
 git clone https://github.com/topivi/ultra-fan.git
