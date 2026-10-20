@@ -11,7 +11,7 @@
   <strong>A tiny Linux fan-tuning project for Dell mini PCs and compact desktops.</strong>
 </p>
 
-`ultra-fan` is a small Python script that keeps an eye on the CPU temperature and adjusts the Dell fan speed automatically. It is the kind of project you build when you want a quieter PC, a cooler CPU, and a little bit of hardware hacking without buying a fancy external controller.
+`ultra-fan` is a small Python script that keeps an eye on the CPU temperature and adjusts the Dell fan speed automatically. It is the kind of project you build when you want a quieter PC, a cooler CPU, and a bit more control over Linux hardware.
 
 If your Dell machine exposes its fan controls through `/sys/class/hwmon`, this script can use that interface to make the fan react to heat instead of running at a fixed, noisy speed.
 
@@ -98,26 +98,94 @@ Typical paths the script checks:
 
 ## Quick start
 
-## Installing as a systemd service
+### Install the project to /opt/ultra-fan and run it as a Ubuntu Systemd service
 
-You can install the controller as a background service so it starts automatically on boot.
+The repository includes a ready-made installer script that copies the code into `/opt/ultra-fan`, creates a Systemd unit, reloads systemd, and starts the service automatically.
 
-1. Clone the repo and enter the project directory:
+Run these commands as root or with `sudo`:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git
+
+cd /tmp
+git clone https://github.com/topivi/ultra-fan.git
+cd ultra-fan
+
+sudo bash install_service.sh
+```
+
+After installation, verify the service is active:
+
+```bash
+sudo systemctl status dell-fan.service --no-pager --lines 20
+```
+
+To view live logs:
+
+```bash
+sudo journalctl -u dell-fan.service -f
+```
+
+The installed service is defined as `dell-fan.service` and runs:
+
+```bash
+/usr/bin/python3 -u /opt/ultra-fan/ultra_fan.py
+```
+
+### Manual installation without the helper script
+
+If you prefer to install it manually, use the following commands:
+
+```bash
+sudo install -d -o root -g root /opt/ultra-fan
+sudo rsync -a --delete --exclude='.git' /tmp/ultra-fan/ /opt/ultra-fan/
+sudo chmod 755 /opt/ultra-fan/ultra_fan.py
+```
+
+Create the Systemd unit:
+
+```bash
+sudo tee /etc/systemd/system/dell-fan.service >/dev/null <<'EOF'
+[Unit]
+Description=Ultra Fan Controller for Dell systems
+After=multi-user.target
+Wants=multi-user.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/ultra-fan
+ExecStart=/usr/bin/python3 -u /opt/ultra-fan/ultra_fan.py
+Restart=always
+RestartSec=5
+User=root
+Group=root
+Environment=PYTHONUNBUFFERED=1
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+```
+
+Enable and start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now dell-fan.service
+sudo systemctl status dell-fan.service --no-pager --lines 20
+```
+
+### Run it manually for testing
+
+If you want to test the script without starting the service:
 
 ```bash
 git clone https://github.com/topivi/ultra-fan.git
 cd ultra-fan
-```
-
-Make it executable:
-
-```bash
 chmod +x ultra_fan.py
-```
-
-Run it:
-
-```bash
 sudo python3 ultra_fan.py
 ```
 
@@ -213,7 +281,7 @@ If you are experimenting on a machine you care about, keep an eye on temperature
 
 ## Project status
 
-This is a small, experimental, DIY-minded fan control tool for Linux-based Dell systems. It works best when you are comfortable with low-level `/sys` access and are happy to tweak the behavior for your specific hardware.
+This is a small, experimental, DIY-minded fan control tool for Linux-based Dell systems. It works best when you are comfortable with low-level `/sys` access and are happy to tweak the behavior for your hardware.
 
 ## Contributing
 
