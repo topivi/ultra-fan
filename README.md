@@ -1,73 +1,93 @@
 # ultra-fan
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Linux-CPU%20Fan%20Control-0A84FF?logo=linux&logoColor=white" alt="Linux CPU Fan Control" />
+  <img src="https://img.shields.io/badge/Linux-Dell%20Fan%20Control-0A84FF?logo=linux&logoColor=white" alt="Linux Dell Fan Control" />
   <img src="https://img.shields.io/badge/Python-3-%233776AB?logo=python&logoColor=white" alt="Python 3" />
   <img src="https://img.shields.io/badge/Hardware-Dell%20OptiPlex-007DB8?logo=dell&logoColor=white" alt="Dell OptiPlex" />
+  <img src="https://img.shields.io/badge/Status-Experimental-orange" alt="Experimental status" />
 </p>
 
-A small Python utility that watches the CPU temperature and adjusts the Dell system fan duty cycle in real time by writing to the Linux hardware monitoring interfaces exposed by `coretemp` and `dell_smm`.
+<p align="center">
+  <strong>Smart CPU fan control for Dell OptiPlex systems running Linux.</strong>
+</p>
 
-This project is designed for Dell OptiPlex systems that expose Dell fan control through `/sys/class/hwmon/*`, allowing a lightweight fan curve to reduce noise while keeping the CPU within safe operating temperatures.
+<p align="center">
+  <img alt="Fan control dashboard" width="900" src="https://raw.githubusercontent.com/topivi/ultra-fan/main/assets/fan-curve-preview.png" />
+</p>
 
-## Why this exists
+> Note: The banner image above is intentionally optional and can be replaced with a local asset in the repository if you want a fully self-hosted look.
 
-Dell systems often expose EC or SMM-backed fan control through Linux `hwmon` entries. This script reads:
+`ultra-fan` is a lightweight Python utility that reads CPU temperature from Linux `hwmon` sensors and adjusts the Dell fan PWM in real time. It is designed for systems where the Dell fan control is exposed via `/sys/class/hwmon/*`, making it useful for laptops and desktops with `coretemp` and `dell_smm` interfaces.
+
+## Overview
+
+This project is focused on one goal: keep the CPU cool without letting the fan scream at full speed all the time.
+
+The script watches:
 
 - CPU temperature from `coretemp`
-- Current fan speed from the Dell hwmon interface
-- Fan PWM target from `/sys/class/hwmon/.../pwm1`
+- Current fan RPM from the Dell hardware monitor
+- Fan PWM level from the Dell `hwmon` interface
 
-It then applies a simple thermal profile with stages such as:
+It then applies a step-based thermal curve to softly ramp the fan up or down based on the current temperature.
 
-- SILENT
-- QUIET
-- LOW
-- MEDIUM
-- HIGH
-- PERFORMANCE
-- ULTRA
+## Why this project exists
 
-The goal is to keep the system responsive without running the fan at maximum speed all the time.
+Many Dell systems expose hardware fan control through Linux sysfs, but they do not automatically provide a quiet or adaptive thermal curve under Ubuntu or other Linux distributions. This utility helps bridge that gap by giving the system a simple, temperature-driven fan policy.
+
+## Highlights
+
+- Automatic detection of `coretemp` and `dell_smm` entries
+- Real-time CPU temperature monitoring
+- Fan speed adjustment using PWM values
+- Simple thermal profile with several operating modes
+- Minimal dependencies: only Python standard library
+- Built for Linux kernel `hwmon` interfaces
 
 ## Features
 
-- Monitors CPU temperature in a loop
-- Detects `coretemp` and `dell_smm` automatically
-- Adjusts Dell fan PWM dynamically
-- Uses a stepped temperature-based profile
-- Keeps running until interrupted with `Ctrl+C`
-- Minimal dependencies: only Python standard library
-
-## Requirements
-
-This script is intended for Linux systems with:
-
-- `coretemp` kernel module loaded
-- `dell_smm_hwmon` or similar Dell hwmon interface available
-- root or write access to the relevant `/sys` entries
-- Python 3 installed
-
-Typical paths that the script looks for include:
-
-- `/sys/class/hwmon/`
-- `/sys/class/hwmon/.../name`
-- `/sys/class/hwmon/.../temp1_input`
-- `/sys/class/hwmon/.../fan1_input`
-- `/sys/class/hwmon/.../pwm1`
+- Reads CPU sensor values from `/sys/class/hwmon`
+- Detects the correct sensor paths dynamically
+- Monitors and reacts to fan RPM changes
+- Applies a stepped thermal response curve
+- Logs current temperature, RPM, target, and mode
+- Stops cleanly on `Ctrl+C`
 
 ## Supported hardware
 
-This project is primarily aimed at:
+This script is primarily intended for:
+
+- Dell OptiPlex systems exposing `dell_smm` / `dell_smm_hwmon`
+- Systems with `coretemp` loaded in Linux
+- Fan controllers exposed through `/sys/class/hwmon/*/pwm1`
+
+Examples of compatible scenarios include:
 
 - Dell OptiPlex 7000 Micro
-- Dell systems exposing `dell_smm` and `coretemp` under `/sys/class/hwmon`
+- Other Dell workstation and desktop models with accessible fan control interfaces
 
-If your system does not expose these devices, the script exits with a helpful error.
+## Requirements
+
+You need:
+
+- Linux with `coretemp` enabled
+- A Dell hardware interface exposed under `/sys/class/hwmon/`
+- Python 3 installed
+- Permission to write to the relevant `/sys` files
+
+Typical paths include:
+
+```bash
+/sys/class/hwmon/
+/sys/class/hwmon/.../name
+/sys/class/hwmon/.../temp1_input
+/sys/class/hwmon/.../fan1_input
+/sys/class/hwmon/.../pwm1
+```
 
 ## Quick start
 
-1. Clone the repo:
+1. Clone the repository:
 
 ```bash
 git clone https://github.com/topivi/ultra-fan.git
@@ -80,7 +100,7 @@ cd ultra-fan
 chmod +x ultra_fan.py
 ```
 
-3. Run it:
+3. Run the script:
 
 ```bash
 sudo python3 ultra_fan.py
@@ -92,93 +112,108 @@ sudo python3 ultra_fan.py
 Ctrl+C
 ```
 
-## How it works
-
-The script performs a continuous loop:
-
-- Reads the CPU temperature from `temp1_input`
-- Reads the current RPM from `fan1_input`
-- Chooses a target fan response based on temperature thresholds
-- Writes a PWM value to `pwm1`
-- Prints a status line such as:
+## Example output
 
 ```text
+--- Dell Smart Fan Control: Active (Ubuntu 26.04) ---
 [12:34:56] Lämpötila: 61.2°C | RPM: 1200 | Tavoite: 1200 | PWM: 128 (MED_PLUS)
+[12:34:57] Lämpötila: 62.4°C | RPM: 1400 | Tavoite: 1600 | PWM: 128 (MED_PLUS)
+[12:34:58] Lämpötila: 58.7°C | RPM: 1000 | Tavoite: 900 | PWM: 128 (MEDIUM)
 ```
 
-The thermal thresholds are tuned for a conservative but responsive fan curve:
+## Fan control profile
 
-| Temperature | Mode | Typical behavior |
+The script uses temperature ranges to select different operational modes:
+
+| Temperature | Mode | Behavior |
 | --- | --- | --- |
 | < 45°C | SILENT | Very low fan speed |
-| 45–49°C | QUIET | Gentle ramp-up |
-| 50–54°C | LOW | Increased airflow |
-| 55–59°C | MEDIUM | Balanced cooling |
-| 60–64°C | MED_PLUS | Active cooling |
-| 65–69°C | HIGH | Strong cooling |
-| 70–74°C | PERFORMANCE | Aggressive response |
+| 45–49°C | QUIET | Gentle ramp up |
+| 50–54°C | LOW | Steady cooling |
+| 55–59°C | MEDIUM | Balanced airflow |
+| 60–64°C | MED_PLUS | Active thermal response |
+| 65–69°C | HIGH | More aggressive cooling |
+| 70–74°C | PERFORMANCE | Strong airflow |
 | 75°C+ | ULTRA | Full cooling effort |
 
-## Important notes
+## How it works
 
-- This script writes directly to Linux hardware control files.
-- It modifies fan behavior at the system level; use with care.
-- On some systems, the `dell_smm` interface may require a specific kernel module or BIOS settings.
-- If your fan is already controlled by another service, this script may conflict with it.
-- Always test carefully before relying on it for long-running thermal control.
+The loop is intentionally simple:
+
+1. Read the CPU temperature.
+2. Read the current fan RPM.
+3. Compare the values against the configured thresholds.
+4. Increase or decrease PWM depending on whether the fan is too slow or too fast.
+5. Write the new setting to `pwm1`.
+6. Repeat every second.
+
+This creates a simple closed-loop control scheme that responds to thermal load in near real time.
 
 ## Troubleshooting
 
-### Script reports missing hwmon paths
+### Missing `hwmon` paths
 
-Check that the relevant modules are loaded:
+If the script exits with a missing hardware error:
 
 ```bash
 ls /sys/class/hwmon
 ```
 
-Look for entries such as:
+Check whether `coretemp` and `dell_smm` are present. If they are missing, the kernel modules may not be loaded or the hardware may not expose them.
 
-- `coretemp`
-- `dell_smm` / `dell_smm_hwmon`
+### Fan does not react
 
-If they are missing, verify the kernel modules and system configuration.
-
-### No fan response
-
-Confirm that the Dell fan interface is writable:
+Verify that the PWM interface is available and writable:
 
 ```bash
 ls -l /sys/class/hwmon/*/pwm1
 ```
 
-If permissions are restricted, run the script with `sudo` or adjust your system access.
+If access is restricted, run the script with `sudo`.
 
-### CPU temperature reads as zero or invalid
+### Temperature reads zero or invalid values
 
-This can happen if the sensor is not exposed or the file path differs on your platform. Check:
+Check the actual sensor output:
 
 ```bash
 cat /sys/class/hwmon/*/temp1_input
 ```
 
-and verify the correct sensor path for your hardware.
+If the file is missing or reports invalid data, your sensor layout may differ from what this script expects.
 
-## Security and safety
+### Another fan service is active
 
-This project is a fan-control tool, not a general-purpose system service. It is intentionally small and direct. Use it responsibly and understand that changing fan PWM can affect thermal behavior and hardware wear.
+If a different daemon is controlling the fan, this script may fight with it. In those cases, disable the competing service before running this tool.
+
+## Safety and limitations
+
+This project writes directly to hardware-level Linux files. That means:
+
+- It can affect system cooling behavior
+- It may conflict with OEM or system services
+- It is hardware- and kernel-dependent
+- It is not a universal solution for every Dell platform
+
+Use it carefully and test it on a system you can monitor.
+
+## Project status
+
+This repository is a focused, experimental utility for Linux-based fan tuning on compatible Dell hardware. It is best suited for users comfortable working with low-level `/sys` interfaces and hardware monitoring.
+
+## Contributing
+
+Contributions are welcome. If you have:
+
+- better temperature thresholds
+- support for additional Dell models
+- improvements to the fan curve
+- better logging or safety checks
+
+please open an issue or submit a pull request.
 
 ## License
 
 This project is provided as-is for personal and experimental use.
-
-## Project status
-
-This repository is a lightweight, focused utility for Linux-based Dell fan control. It is best suited for users comfortable working with low-level hardware interfaces and `/sys` entries.
-
-## Contributing
-
-Issues, improvements, and pull requests are welcome. If you have a new temperature profile, hardware compatibility notes, or a cleaner fan curve, feel free to contribute.
 
 ---
 
