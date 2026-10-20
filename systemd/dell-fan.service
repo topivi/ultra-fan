@@ -1,0 +1,17 @@
+# Copy this file to /etc/systemd/system/dell-fan.service
+# and replace the sample path below with the actual path to the cloned repo.
+[Unit]
+Description=Dell Smart Fan Control for Ubuntu
+After=multi-user.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/username/ultra-fan
+ExecStart=/usr/bin/python3 -u /home/username/ultra-fan/ultra_fan.py
+Restart=always
+RestartSec=5
+User=root
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
