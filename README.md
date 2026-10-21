@@ -23,6 +23,16 @@ sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
 
 Without these parameters, Linux may expose the hwmon directory but still block writes to the PWM files, so the script cannot adjust the fan speed.
 
+For a persistent setup, save the module options in `/etc/modprobe.d/dell_smm_hwmon.conf`:
+
+```bash
+sudo tee /etc/modprobe.d/dell_smm_hwmon.conf >/dev/null <<'EOF'
+options dell_smm_hwmon restricted=0 ignore_dmi=1
+EOF
+```
+
+This ensures the module keeps the required parameters on every boot.
+
 This is based on the idea described in TyTiTaM's Reddit guide for Dell fan control on Linux.
 
 ## Features
@@ -76,9 +86,17 @@ Typical paths checked by the script:
 
 ## Quick start
 
-### 1. Load the Dell hwmon module with the required parameters
+### 1. Save the required Dell hwmon options
 
-Before running the script, load the Dell module correctly:
+Create the modprobe config file so the options are applied automatically at boot:
+
+```bash
+sudo tee /etc/modprobe.d/dell_smm_hwmon.conf >/dev/null <<'EOF'
+options dell_smm_hwmon restricted=0 ignore_dmi=1
+EOF
+```
+
+Then load the module immediately for the current session:
 
 ```bash
 sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
@@ -133,6 +151,9 @@ If you want to test it without installing the service:
 ```bash
 cd ultra-fan
 chmod +x ultra_fan.py
+sudo tee /etc/modprobe.d/dell_smm_hwmon.conf >/dev/null <<'EOF'
+options dell_smm_hwmon restricted=0 ignore_dmi=1
+EOF
 sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
 sudo python3 ultra_fan.py
 ```
@@ -210,6 +231,14 @@ This is the most common issue on Dell systems. The module must be loaded with th
 
 ```bash
 sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
+```
+
+For persistence, keep them in `/etc/modprobe.d/dell_smm_hwmon.conf`:
+
+```bash
+sudo tee /etc/modprobe.d/dell_smm_hwmon.conf >/dev/null <<'EOF'
+options dell_smm_hwmon restricted=0 ignore_dmi=1
+EOF
 ```
 
 If you still cannot write to `/sys/class/hwmon/.../pwm1`, check that the module is actually active:
