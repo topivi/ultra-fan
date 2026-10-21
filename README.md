@@ -15,7 +15,15 @@
 
 This project is intended for Dell desktops and mini PCs where the stock fan policy is too noisy or too slow. It is especially useful on OptiPlex systems with `coretemp` and `dell_smm`/`dell_smm_hwmon` exposed in Linux.
 
-It is based on the idea described in TyTiTaM's Reddit guide for Dell fan control on Linux.
+Important: on many Dell systems the `dell_smm_hwmon` kernel module must be loaded with these parameters before the fan-control files become writable:
+
+```bash
+sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
+```
+
+Without these parameters, Linux may expose the hwmon directory but still block writes to the PWM files, so the script cannot adjust the fan speed.
+
+This is based on the idea described in TyTiTaM's Reddit guide for Dell fan control on Linux.
 
 ## Features
 
@@ -45,6 +53,7 @@ You will need:
 
 - Linux with `coretemp` available
 - a Dell fan interface exposed in `/sys/class/hwmon/`
+- the `dell_smm_hwmon` kernel module loaded with `restricted=0` and `ignore_dmi=1`
 - Python 3
 - root permissions to write to the relevant sysfs files
 
@@ -67,14 +76,24 @@ Typical paths checked by the script:
 
 ## Quick start
 
-### 1. Clone the repository
+### 1. Load the Dell hwmon module with the required parameters
+
+Before running the script, load the Dell module correctly:
+
+```bash
+sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
+```
+
+If the module is not loaded or the parameters are missing, the interface may exist but writes to `/sys/class/hwmon/.../pwm1` will fail.
+
+### 2. Clone the repository
 
 ```bash
 git clone https://github.com/topivi/ultra-fan.git
 cd ultra-fan
 ```
 
-### 2. Install as a systemd service
+### 3. Install as a systemd service
 
 Run the installer as root or with `sudo`:
 
@@ -89,13 +108,13 @@ This script:
 - reloads systemd
 - enables and starts the service
 
-### 3. Verify the service
+### 4. Verify the service
 
 ```bash
 sudo systemctl status dell-fan.service --no-pager --lines 20
 ```
 
-### 4. View logs
+### 5. View logs
 
 ```bash
 sudo journalctl -u dell-fan.service -f
@@ -114,6 +133,7 @@ If you want to test it without installing the service:
 ```bash
 cd ultra-fan
 chmod +x ultra_fan.py
+sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
 sudo python3 ultra_fan.py
 ```
 
@@ -183,6 +203,21 @@ ls /sys/class/hwmon
 ```
 
 If `coretemp` or `dell_smm` is missing, the script will not have what it needs.
+
+### `dell_smm_hwmon` is present but writes fail
+
+This is the most common issue on Dell systems. The module must be loaded with the following options:
+
+```bash
+sudo modprobe dell_smm_hwmon restricted=0 ignore_dmi=1
+```
+
+If you still cannot write to `/sys/class/hwmon/.../pwm1`, check that the module is actually active:
+
+```bash
+ls /sys/class/hwmon
+cat /sys/module/dell_smm_hwmon/parameters/* 2>/dev/null || true
+```
 
 ### No fan response
 
