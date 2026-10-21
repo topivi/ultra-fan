@@ -8,74 +8,36 @@
 </p>
 
 <p align="center">
-  <strong>A tiny Linux fan-tuning project for Dell mini PCs and compact desktops.</strong>
+  <strong>Linux fan control for Dell OptiPlex machines.</strong>
 </p>
 
-`ultra-fan` is a small Python script that keeps an eye on the CPU temperature and adjusts the Dell fan speed automatically. It is the kind of project you build when you want a quieter PC, a cooler CPU, and a bit more control over Linux hardware.
+`ultra-fan` is a lightweight Python utility for Dell systems that exposes fan control through `/sys/class/hwmon`. It reads the CPU temperature, watches the current RPM, and adjusts the PWM value to keep the machine cooler without running the fan aggressively all the time.
 
-If your Dell machine exposes its fan controls through `/sys/class/hwmon`, this script can use that interface to make the fan react to heat instead of running at a fixed, noisy speed.
+This project is intended for Dell desktops and mini PCs where the stock fan policy is too noisy or too slow. It is especially useful on OptiPlex systems with `coretemp` and `dell_smm`/`dell_smm_hwmon` exposed in Linux.
 
-This is based on the idea by TyTiTaM's <A href="https://www.reddit.com/r/SleepingOptiplex/comments/1rudwdu/ultimate_fan_control_guide_for_dell_optiplex_linux/">Reddit article</a>.
+It is based on the idea described in TyTiTaM's Reddit guide for Dell fan control on Linux.
 
-## What this project does
+## Features
 
-This script:
-
-- reads the CPU temperature from `coretemp`
-- reads the current fan RPM from the Dell `hwmon` interface
-- checks the current PWM setting
-- changes the fan output based on temperature thresholds
-- prints the live status so you can see what the machine is doing
-
-The result is a simple closed-loop fan controller that reacts to heat in real time.
-
-## Why I built it
-
-Dell machines are usually fine out of the box, but sometimes the fan policy is either too aggressive or too lazy. On a quiet home setup, a little custom tuning can make a big difference.
-
-This project is for people who like to:
-
-- tinker with Linux hardware
-- make their PC quieter without sacrificing cooling
-- experiment with `/sys` and `hwmon`
-- build a small, practical project instead of installing a giant desktop utility
-
-## DIY maker vibe
-
-This is not a polished enterprise controller. It is a practical script for a hobbyist workflow:
-
-- plug it in
-- test it
-- watch the temps
-- tweak the thresholds
-- keep the machine cool without the fan screaming
-
-It is the sort of tool you might use on a bench setup, a home lab box, or a small Dell machine that deserves a bit more control.
-
-## How it works
-
-The script loops continuously and does this every second:
-
-1. Reads CPU temperature
-2. Reads fan RPM from the Dell sensor path
-3. Chooses a mode based on the current temperature
-4. Adjusts the PWM value for the fan
-5. Logs the current state to the terminal
-
-The logic is intentionally simple and easy to understand. That is the point: keep it readable, tweakable, and useful.
+- reads CPU temperature from `coretemp`
+- reads current fan RPM from the Dell `hwmon` interface
+- checks the active PWM value
+- adjusts the fan speed dynamically based on temperature thresholds
+- prints live status information every second
+- can be installed as a `systemd` service
 
 ## Supported hardware
 
-This project is aimed at Dell systems that expose:
+This project is designed for Dell systems that expose:
 
 - `coretemp`
 - `dell_smm` or `dell_smm_hwmon`
-- fan control via `/sys/class/hwmon/.../pwm1`
+- fan control under `/sys/class/hwmon/.../pwm1`
 
-Typical examples:
+Examples include:
 
 - Dell OptiPlex 7000 Micro
-- Other Dell desktops and workstations with exposed Linux fan interfaces
+- other Dell systems with a comparable Linux `hwmon` layout
 
 ## Requirements
 
@@ -84,9 +46,9 @@ You will need:
 - Linux with `coretemp` available
 - a Dell fan interface exposed in `/sys/class/hwmon/`
 - Python 3
-- permission to write to the relevant sysfs files
+- root permissions to write to the relevant sysfs files
 
-Typical paths the script checks:
+Typical paths checked by the script:
 
 ```bash
 /sys/class/hwmon/
@@ -96,94 +58,60 @@ Typical paths the script checks:
 /sys/class/hwmon/.../pwm1
 ```
 
+## Repository contents
+
+- `ultra_fan.py` — main fan control loop
+- `install_service.sh` — installs the application and creates a `systemd` service
+- `systemd/` — service configuration related files
+- `README.md` — project documentation
+
 ## Quick start
 
-### Install the project to /opt/ultra-fan and run it as a Ubuntu Systemd service
-
-The repository includes a ready-made installer script that copies the code into `/opt/ultra-fan`, creates a Systemd unit, reloads systemd, and starts the service automatically.
-
-Run these commands as root or with `sudo`:
+### 1. Clone the repository
 
 ```bash
-sudo apt-get update
-sudo apt-get install -y git
-
-cd /tmp
 git clone https://github.com/topivi/ultra-fan.git
 cd ultra-fan
+```
 
+### 2. Install as a systemd service
+
+Run the installer as root or with `sudo`:
+
+```bash
 sudo bash install_service.sh
 ```
 
-After installation, verify the service is active:
+This script:
+
+- copies the project to `/opt/ultra-fan`
+- creates a `systemd` unit named `dell-fan.service`
+- reloads systemd
+- enables and starts the service
+
+### 3. Verify the service
 
 ```bash
 sudo systemctl status dell-fan.service --no-pager --lines 20
 ```
 
-To view live logs:
+### 4. View logs
 
 ```bash
 sudo journalctl -u dell-fan.service -f
 ```
 
-The installed service is defined as `dell-fan.service` and runs:
+The installed service runs:
 
 ```bash
 /usr/bin/python3 -u /opt/ultra-fan/ultra_fan.py
 ```
 
-### Manual installation without the helper script
+## Manual run for testing
 
-If you prefer to install it manually, use the following commands:
-
-```bash
-sudo install -d -o root -g root /opt/ultra-fan
-sudo rsync -a --delete --exclude='.git' /tmp/ultra-fan/ /opt/ultra-fan/
-sudo chmod 755 /opt/ultra-fan/ultra_fan.py
-```
-
-Create the Systemd unit:
+If you want to test it without installing the service:
 
 ```bash
-sudo tee /etc/systemd/system/dell-fan.service >/dev/null <<'EOF'
-[Unit]
-Description=Ultra Fan Controller for Dell systems
-After=multi-user.target
-Wants=multi-user.target
-StartLimitIntervalSec=0
-
-[Service]
-Type=simple
-WorkingDirectory=/opt/ultra-fan
-ExecStart=/usr/bin/python3 -u /opt/ultra-fan/ultra_fan.py
-Restart=always
-RestartSec=5
-User=root
-Group=root
-Environment=PYTHONUNBUFFERED=1
-StandardOutput=journal
-StandardError=journal
-
-[Install]
-WantedBy=multi-user.target
-EOF
-```
-
-Enable and start it:
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now dell-fan.service
-sudo systemctl status dell-fan.service --no-pager --lines 20
-```
-
-### Run it manually for testing
-
-If you want to test the script without starting the service:
-
-```bash
-git clone https://github.com/topivi/ultra-fan.git
 cd ultra-fan
 chmod +x ultra_fan.py
 sudo python3 ultra_fan.py
@@ -195,6 +123,18 @@ Stop it with:
 Ctrl+C
 ```
 
+## How it works
+
+The script loops once per second and performs the following:
+
+1. reads CPU temperature
+2. reads current RPM from the Dell sensor path
+3. selects a thermal mode based on the current temperature
+4. updates the PWM value for the fan
+5. logs the current state to the terminal
+
+The logic is intentionally simple and easy to adjust.
+
 ## Example output
 
 ```text
@@ -204,7 +144,7 @@ Ctrl+C
 [12:34:58] Lämpötila: 58.7°C | RPM: 1000 | Tavoite: 900 | PWM: 128 (MEDIUM)
 ```
 
-## Fan curve
+## Fan behavior
 
 The script uses a simple thermal ladder:
 
@@ -219,24 +159,24 @@ The script uses a simple thermal ladder:
 | 70–74°C | PERFORMANCE | Aggressive response |
 | 75°C+ | ULTRA | Full cooling effort |
 
-This is intentionally basic and easy to tune. If your machine runs hotter or cooler, you can edit the thresholds and PWM values.
+This is intentionally basic and designed to be easy to tune.
 
 ## Tuning it yourself
 
-This is a good DIY project because the logic is straightforward. If you want to tune the behavior:
+If your hardware runs hotter or cooler than expected, edit the thresholds and PWM values in `ultra_fan.py`.
 
-- change the temperature thresholds
-- adjust the PWM values
-- swap in different RPM targets
-- add logging for longer-term analysis
+Common customizations:
 
-For example, if your machine runs warm but stays stable, you could move the thresholds a few degrees upward to keep it quieter.
+- change temperature thresholds
+- adjust PWM values
+- tune RPM goals
+- add extra logging or safety checks
 
 ## Troubleshooting
 
-### Missing `hwmon` paths
+### Missing hwmon paths
 
-Check whether the platform is exposing the sensors:
+Check whether the platform exposes the sensors:
 
 ```bash
 ls /sys/class/hwmon
@@ -256,7 +196,7 @@ If access is restricted, run the script with `sudo`.
 
 ### Temperature looks wrong
 
-Check the raw sensor files:
+Check the raw sensor values:
 
 ```bash
 cat /sys/class/hwmon/*/temp1_input
@@ -266,33 +206,22 @@ If the values look invalid, your hardware may expose different sensor names or p
 
 ### Another service is already controlling the fan
 
-This is common on some systems. If a different fan-management tool is active, it may fight with this script. Disable the competing service before testing.
+Some systems run another fan-management utility that conflicts with this script. Disable the competing service before testing.
 
 ## Safety notes
 
-This script writes directly to Linux hardware interfaces, so use it with care:
+This project writes directly to Linux hardware interfaces, so use it carefully:
 
-- it can change thermal behavior
+- it changes thermal behavior
 - it may conflict with OEM utilities
-- it depends on your hardware and kernel exposing the right files
+- it depends on your hardware and kernel exposing the correct files
 - it is not a universal fix for every Dell model
 
-If you are experimenting on a machine you care about, keep an eye on temperatures and test slowly.
+If you are experimenting on a machine you care about, keep an eye on temperatures and test carefully.
 
 ## Project status
 
-This is a small, experimental, DIY-minded fan control tool for Linux-based Dell systems. It works best when you are comfortable with low-level `/sys` access and are happy to tweak the behavior for your hardware.
-
-## Contributing
-
-If you have:
-
-- better temperature thresholds
-- support for more Dell models
-- a cleaner fan curve
-- better logging or safety checks
-
-feel free to open an issue or send a pull request.
+This is a small, experimental, DIY-oriented fan control utility for Linux-based Dell systems. It works best when you are comfortable with low-level `/sys` access and willing to tune behavior to match your hardware.
 
 ## License
 
